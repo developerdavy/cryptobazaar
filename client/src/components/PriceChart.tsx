@@ -10,101 +10,105 @@ export default function PriceChart() {
 
   const { data: priceData } = useQuery({
     queryKey: ["/api/market/btc-usd"],
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
     const loadChart = async () => {
-      if (!canvasRef.current) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-      // Dynamically import Chart.js to avoid SSR issues
-      const { Chart, registerables } = await import('chart.js');
-      Chart.register(...registerables);
+      try {
+        const { Chart, registerables } = await import('chart.js');
+        Chart.register(...registerables);
 
-      const ctx = canvasRef.current.getContext('2d');
-      if (!ctx) return;
-
-      // Destroy existing chart if it exists
-      if (chartRef.current) {
-        chartRef.current.destroy();
-      }
-
-      // Generate mock price data for demonstration
-      const generatePriceData = () => {
-        const data = [];
-        const labels = [];
-        let basePrice = 43521;
-        
-        for (let i = 0; i < 24; i++) {
-          const hour = i.toString().padStart(2, '0') + ':00';
-          labels.push(hour);
-          
-          // Add some realistic price variation
-          const variation = (Math.random() - 0.5) * 1000;
-          basePrice += variation;
-          data.push(basePrice);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          console.warn('Canvas context not available');
+          return;
         }
-        
-        return { labels, data };
-      };
 
-      const chartData = generatePriceData();
-      
-      chartRef.current = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: chartData.labels,
-          datasets: [{
-            label: 'BTC Price',
-            data: chartData.data,
-            borderColor: 'hsl(var(--ring))',
-            backgroundColor: 'hsla(var(--ring) / 0.1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            pointHoverBackgroundColor: 'hsl(var(--ring))'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: false
-            }
+        if (chartRef.current) {
+          chartRef.current.destroy();
+        }
+
+        const generatePriceData = () => {
+          const data = [];
+          const labels = [];
+          let basePrice = 43521;
+          
+          for (let i = 0; i < 24; i++) {
+            const hour = i.toString().padStart(2, '0') + ':00';
+            labels.push(hour);
+            
+            const variation = (Math.random() - 0.5) * 1000;
+            basePrice += variation;
+            data.push(basePrice);
+          }
+          
+          return { labels, data };
+        };
+
+        const chartData = generatePriceData();
+        
+        chartRef.current = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: chartData.labels,
+            datasets: [{
+              label: 'BTC Price',
+              data: chartData.data,
+              borderColor: 'hsl(var(--ring))',
+              backgroundColor: 'hsla(var(--ring) / 0.1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.4,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              pointHoverBackgroundColor: 'hsl(var(--ring))'
+            }]
           },
-          scales: {
-            x: {
-              display: true,
-              grid: {
-                color: 'hsla(var(--border) / 0.5)',
-              },
-              ticks: {
-                color: 'hsl(var(--muted-foreground))',
-                maxTicksLimit: 6
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
               }
             },
-            y: {
-              display: true,
-              grid: {
-                color: 'hsla(var(--border) / 0.5)',
+            scales: {
+              x: {
+                display: true,
+                grid: {
+                  color: 'hsla(var(--border) / 0.5)',
+                },
+                ticks: {
+                  color: 'hsl(var(--muted-foreground))',
+                  maxTicksLimit: 6
+                }
               },
-              ticks: {
-                color: 'hsl(var(--muted-foreground))',
-                callback: function(value: any) {
-                  return '$' + value.toLocaleString();
+              y: {
+                display: true,
+                grid: {
+                  color: 'hsla(var(--border) / 0.5)',
+                },
+                ticks: {
+                  color: 'hsl(var(--muted-foreground))',
+                  callback: function(value: any) {
+                    return '$' + value.toLocaleString();
+                  }
                 }
               }
+            },
+            interaction: {
+              intersect: false,
+              mode: 'index'
             }
-          },
-          interaction: {
-            intersect: false,
-            mode: 'index'
           }
-        }
-      });
+        });
+      } catch (error) {
+        console.error('Failed to load chart:', error);
+      }
     };
 
     loadChart();
@@ -124,7 +128,7 @@ export default function PriceChart() {
             <h2 className="text-xl font-semibold">BTC/USD</h2>
             <div className="flex items-center space-x-4 mt-1">
               <span className="text-2xl font-bold text-ring">
-                {priceData?.price ? `$${priceData.price.toLocaleString()}` : '$43,521.00'}
+                {(priceData as any)?.price ? `$${(priceData as any).price.toLocaleString()}` : '$43,521.00'}
               </span>
               <span className="text-ring bg-ring/20 px-2 py-1 rounded text-sm">
                 +2.34%
