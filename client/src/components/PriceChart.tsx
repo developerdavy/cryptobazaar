@@ -20,7 +20,8 @@ export default function PriceChart() {
 
       try {
         const { Chart, registerables } = await import('chart.js');
-        Chart.register(...registerables);
+        const { CandlestickController, CandlestickElement } = await import('chartjs-chart-financial');
+        Chart.register(...registerables, CandlestickController, CandlestickElement);
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -32,7 +33,7 @@ export default function PriceChart() {
           chartRef.current.destroy();
         }
 
-        const generatePriceData = () => {
+        const generateCandlestickData = () => {
           const data = [];
           const labels = [];
           let basePrice = 43521;
@@ -41,32 +42,47 @@ export default function PriceChart() {
             const hour = i.toString().padStart(2, '0') + ':00';
             labels.push(hour);
             
-            const variation = (Math.random() - 0.5) * 1000;
-            basePrice += variation;
-            data.push(basePrice);
+            const open = basePrice;
+            const variation1 = (Math.random() - 0.5) * 500;
+            const variation2 = (Math.random() - 0.5) * 500;
+            const high = Math.max(open, open + variation1, open + variation2) + Math.random() * 200;
+            const low = Math.min(open, open + variation1, open + variation2) - Math.random() * 200;
+            const close = open + variation1;
+            
+            data.push({
+              x: hour,
+              o: open,
+              h: high,
+              l: low,
+              c: close
+            });
+            
+            basePrice = close;
           }
           
           return { labels, data };
         };
 
-        const chartData = generatePriceData();
+        const chartData = generateCandlestickData();
         
         chartRef.current = new Chart(ctx, {
-          type: 'line',
+          type: 'candlestick' as any,
           data: {
-            labels: chartData.labels,
             datasets: [{
               label: 'BTC Price',
               data: chartData.data,
-              borderColor: 'hsl(var(--ring))',
-              backgroundColor: 'hsla(var(--ring) / 0.1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.4,
-              pointRadius: 0,
-              pointHoverRadius: 4,
-              pointHoverBackgroundColor: 'hsl(var(--ring))'
-            }]
+              borderColor: {
+                up: 'hsl(var(--ring))',
+                down: '#ff6b6b',
+                unchanged: 'hsl(var(--muted-foreground))'
+              },
+              backgroundColor: {
+                up: 'hsla(var(--ring) / 0.8)',
+                down: 'rgba(255, 107, 107, 0.8)',
+                unchanged: 'hsla(var(--muted-foreground) / 0.8)'
+              },
+              borderWidth: 1
+            } as any]
           },
           options: {
             responsive: true,
