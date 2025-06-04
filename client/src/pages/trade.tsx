@@ -1,3 +1,7 @@
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TradingPanel from "@/components/trading-panel";
@@ -7,13 +11,44 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 export default function Trade() {
+  const { toast } = useToast();
+  const { isAuthenticated, isLoading } = useAuth();
+  
   const { data: marketData = [] } = useQuery({
     queryKey: ["/api/market-data"],
   });
 
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+  }, [isAuthenticated, isLoading, toast]);
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ring mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background">
+      <Navbar />
+      <main className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Market Overview Sidebar */}
         <div className="lg:col-span-1">
           <Card className="glass-effect border-border/50">
@@ -21,7 +56,7 @@ export default function Trade() {
               <CardTitle className="text-lg">Markets</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {marketData.map((market: any) => (
+              {Array.isArray(marketData) && marketData.map((market: any) => (
                 <div key={market.symbol} className="flex items-center justify-between p-3 bg-card/50 rounded-lg hover:bg-card transition-colors cursor-pointer">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-r from-orange-400 to-yellow-400 rounded-full flex items-center justify-center">
@@ -107,6 +142,7 @@ export default function Trade() {
           </div>
         </div>
       </div>
+      </main>
     </div>
   );
 }

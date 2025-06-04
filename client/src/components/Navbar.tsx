@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Box, Wallet, ChevronDown } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,24 +11,43 @@ import {
 
 export default function Navbar() {
   const { user } = useAuth();
+  const [location] = useLocation();
+
+  const navItems = [
+    { href: "/", label: "Dashboard" },
+    { href: "/trade", label: "Trade" },
+    { href: "/wallet", label: "Wallet" },
+    { href: "/markets", label: "Markets" },
+    { href: "/history", label: "History" },
+  ];
 
   return (
     <header className="glass-effect sticky top-0 z-50 border-b border-border/50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-ring to-primary rounded-lg flex items-center justify-center">
-                <Box className="w-4 h-4 text-white" />
+            <Link href="/">
+              <div className="flex items-center space-x-2 cursor-pointer">
+                <div className="w-8 h-8 bg-gradient-to-r from-ring to-primary rounded-lg flex items-center justify-center">
+                  <Box className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-xl font-bold">CryptoX</span>
               </div>
-              <span className="text-xl font-bold">CryptoX</span>
-            </div>
+            </Link>
             <nav className="hidden md:flex space-x-6">
-              <a href="#" className="text-ring hover:text-foreground transition-colors">Dashboard</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Trade</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Wallet</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Markets</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">History</a>
+              {navItems.map((item) => (
+                <Link key={item.href} href={item.href}>
+                  <a
+                    className={`transition-colors ${
+                      location === item.href
+                        ? "text-ring"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </a>
+                </Link>
+              ))}
             </nav>
           </div>
           <div className="flex items-center space-x-4">
