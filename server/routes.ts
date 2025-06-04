@@ -1,33 +1,94 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertTransactionSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+  // Demo user for development
+  const demoUserId = 'demo-user';
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+  // Initialize demo data
+  async function initializeDemoData() {
+    // Create demo user
+    await storage.upsertUser({
+      id: demoUserId,
+      email: 'demo@cryptox.com',
+      firstName: 'Demo',
+      lastName: 'User',
+      profileImageUrl: null,
+    });
+
+    // Initialize market data with realistic prices
+    const marketData = [
+      { symbol: 'BTC', price: 43521, change: 2.34 },
+      { symbol: 'ETH', price: 2341, change: -1.23 },
+      { symbol: 'ADA', price: 0.5, change: 5.67 },
+      { symbol: 'SOL', price: 98.45, change: 3.21 },
+      { symbol: 'DOT', price: 6.78, change: -0.89 },
+    ];
+
+    for (const data of marketData) {
+      await storage.upsertMarketData(data.symbol, data.price, data.change);
     }
+
+    // Initialize demo holdings
+    await storage.upsertHolding({
+      userId: demoUserId,
+      cryptocurrency: 'BTC',
+      balance: '0.5234',
+      averageCost: '42000',
+    });
+
+    await storage.upsertHolding({
+      userId: demoUserId,
+      cryptocurrency: 'ETH',
+      balance: '5.8',
+      averageCost: '2200',
+    });
+
+    await storage.upsertHolding({
+      userId: demoUserId,
+      cryptocurrency: 'ADA',
+      balance: '1250',
+      averageCost: '0.48',
+    });
+
+    // Create demo transactions
+    const transactions = [
+      { type: 'buy', crypto: 'BTC', amount: '0.1', fiatAmount: '4350', price: '43500' },
+      { type: 'sell', crypto: 'ETH', amount: '1.2', fiatAmount: '2800', price: '2333' },
+      { type: 'buy', crypto: 'ADA', amount: '500', fiatAmount: '250', price: '0.5' },
+    ];
+
+    for (const tx of transactions) {
+      await storage.createTransaction({
+        userId: demoUserId,
+        type: tx.type as 'buy' | 'sell',
+        cryptocurrency: tx.crypto,
+        amount: tx.amount,
+        fiatAmount: tx.fiatAmount,
+        price: tx.price,
+        fee: '2.99',
+        status: 'completed',
+      });
+    }
+  }
+
+  // Initialize demo data on startup
+  await initializeDemoData();
+
+  // Auth route (returns demo user)
+  app.get('/api/auth/user', async (req, res) => {
+    const user = await storage.getUser(demoUserId);
+    res.json(user);
   });
 
-  // Portfolio routes
-  app.get("/api/portfolio", isAuthenticated, async (req: any, res) => {
+  // Portfolio summary
+  app.get("/api/portfolio", async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const holdings = await storage.getUserHoldings(userId);
+      const holdings = await storage.getUserHoldings(demoUserId);
       
-      // Calculate portfolio totals
       let totalBalance = 0;
       let dailyPnL = 0;
       
@@ -44,10 +105,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         totalBalance,
-        availableBalance: 12543.67, // Mock available balance
+        availableBalance: 15243.67,
         dailyPnL,
         dailyPnLPercent: totalBalance > 0 ? (dailyPnL / totalBalance) * 100 : 0,
-        totalTrades: 127, // Mock total trades
+        totalTrades: 127,
       });
     } catch (error) {
       console.error("Error fetching portfolio:", error);
@@ -55,13 +116,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Holdings routes
-  app.get("/api/holdings", isAuthenticated, async (req: any, res) => {
+  // Holdings with market data
+  app.get("/api/holdings", async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const holdings = await storage.getUserHoldings(userId);
+      const holdings = await storage.getUserHoldings(demoUserId);
       
-      // Enrich holdings with market data
       const enrichedHoldings = await Promise.all(
         holdings.map(async (holding) => {
           const marketData = await storage.getMarketData(holding.cryptocurrency);
@@ -81,12 +140,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Transaction routes
-  app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
+  // Transaction history
+  app.get("/api/transactions", async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
       const limit = parseInt(req.query.limit as string) || 10;
-      const transactions = await storage.getUserTransactions(userId, limit);
+      const transactions = await storage.getUserTransactions(demoUserId, limit);
       res.json(transactions);
     } catch (error) {
       console.error("Error fetching transactions:", error);
@@ -94,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Trading routes
+  // Execute trades
   const tradeSchema = z.object({
     type: z.enum(['buy', 'sell']),
     cryptocurrency: z.string(),
@@ -102,30 +160,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     fiatAmount: z.number().positive(),
   });
 
-  app.post("/api/trades", isAuthenticated, async (req: any, res) => {
+  app.post("/api/trades", async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
       const tradeData = tradeSchema.parse(req.body);
       
-      // Get current market price
       let marketData = await storage.getMarketData(tradeData.cryptocurrency);
       if (!marketData) {
-        // Mock market prices for demo
         const mockPrices: { [key: string]: number } = {
           'BTC': 43521,
           'ETH': 2341,
           'ADA': 0.5,
+          'SOL': 98.45,
+          'DOT': 6.78,
         };
         const price = mockPrices[tradeData.cryptocurrency] || 100;
         marketData = await storage.upsertMarketData(tradeData.cryptocurrency, price, 2.34);
       }
       
       const price = parseFloat(marketData.price);
-      const fee = 0.99; // Fixed fee for demo
+      const fee = 2.99;
       
-      // Create transaction record
       const transaction = await storage.createTransaction({
-        userId,
+        userId: demoUserId,
         type: tradeData.type,
         cryptocurrency: tradeData.cryptocurrency,
         amount: tradeData.amount.toString(),
@@ -136,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Update holdings
-      const existingHolding = await storage.getHolding(userId, tradeData.cryptocurrency);
+      const existingHolding = await storage.getHolding(demoUserId, tradeData.cryptocurrency);
       const currentBalance = existingHolding ? parseFloat(existingHolding.balance) : 0;
       const currentAvgCost = existingHolding ? parseFloat(existingHolding.averageCost) : 0;
       
@@ -145,16 +201,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (tradeData.type === 'buy') {
         newBalance = currentBalance + tradeData.amount;
-        // Calculate new average cost
         const totalCost = (currentBalance * currentAvgCost) + (tradeData.amount * price);
         newAvgCost = newBalance > 0 ? totalCost / newBalance : price;
       } else {
         newBalance = Math.max(0, currentBalance - tradeData.amount);
-        newAvgCost = currentAvgCost; // Keep same average cost when selling
+        newAvgCost = currentAvgCost;
       }
       
       await storage.upsertHolding({
-        userId,
+        userId: demoUserId,
         cryptocurrency: tradeData.cryptocurrency,
         balance: newBalance.toString(),
         averageCost: newAvgCost.toString(),
@@ -171,24 +226,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Market data routes
+  // Market data endpoint
   app.get("/api/market/:symbol", async (req, res) => {
     try {
       const symbol = req.params.symbol.toUpperCase();
       let marketData = await storage.getMarketData(symbol);
       
       if (!marketData) {
-        // Mock market prices for demo
         const mockPrices: { [key: string]: number } = {
-          'BTC-USD': 43521,
           'BTC': 43521,
-          'ETH-USD': 2341,
           'ETH': 2341,
-          'ADA-USD': 0.5,
           'ADA': 0.5,
+          'SOL': 98.45,
+          'DOT': 6.78,
         };
         const price = mockPrices[symbol] || 100;
-        marketData = await storage.upsertMarketData(symbol, price, 2.34);
+        marketData = await storage.upsertMarketData(symbol, price, Math.random() * 10 - 5);
       }
       
       res.json({
@@ -204,6 +257,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch market data" });
     }
   });
+
+  // Markets overview
+  app.get("/api/markets", async (req, res) => {
+    try {
+      const symbols = ['BTC', 'ETH', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX', 'LINK'];
+      const markets = [];
+
+      for (const symbol of symbols) {
+        let marketData = await storage.getMarketData(symbol);
+        if (!marketData) {
+          const mockPrices: { [key: string]: number } = {
+            'BTC': 43521,
+            'ETH': 2341,
+            'ADA': 0.5,
+            'SOL': 98.45,
+            'DOT': 6.78,
+            'MATIC': 0.89,
+            'AVAX': 35.67,
+            'LINK': 14.23,
+          };
+          const price = mockPrices[symbol] || Math.random() * 1000;
+          const change = Math.random() * 20 - 10; // -10% to +10%
+          marketData = await storage.upsertMarketData(symbol, price, change);
+        }
+
+        markets.push({
+          symbol,
+          name: getAssetName(symbol),
+          price: parseFloat(marketData.price),
+          priceChange24h: parseFloat(marketData.priceChange24h),
+          volume24h: parseFloat(marketData.volume24h || '1000000'),
+          marketCap: parseFloat(marketData.marketCap || '10000000'),
+        });
+      }
+
+      res.json(markets);
+    } catch (error) {
+      console.error("Error fetching markets:", error);
+      res.status(500).json({ message: "Failed to fetch markets" });
+    }
+  });
+
+  function getAssetName(symbol: string): string {
+    const names: { [key: string]: string } = {
+      'BTC': 'Bitcoin',
+      'ETH': 'Ethereum',
+      'ADA': 'Cardano',
+      'SOL': 'Solana',
+      'DOT': 'Polkadot',
+      'MATIC': 'Polygon',
+      'AVAX': 'Avalanche',
+      'LINK': 'Chainlink',
+    };
+    return names[symbol] || symbol;
+  }
 
   const httpServer = createServer(app);
   return httpServer;

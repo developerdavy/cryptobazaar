@@ -1,16 +1,8 @@
-import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Box, Wallet, ChevronDown } from "lucide-react";
+import { Box, Wallet, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 export default function Navbar() {
-  const { user } = useAuth();
   const [location] = useLocation();
 
   const navItems = [
@@ -53,36 +45,14 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <div className="hidden md:flex items-center space-x-2 bg-card rounded-lg px-3 py-2">
               <Wallet className="w-4 h-4 text-ring" />
-              <span className="text-sm">$12,543.67</span>
+              <span className="text-sm">$22,048.12</span>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-2">
-                  {user?.profileImageUrl ? (
-                    <img
-                      src={user.profileImageUrl}
-                      alt="Profile"
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium">
-                        {user?.firstName?.charAt(0) || user?.email?.charAt(0) || 'U'}
-                      </span>
-                    </div>
-                  )}
-                  <span className="hidden md:inline text-sm">
-                    {user?.firstName || user?.email || 'User'}
-                  </span>
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="glass-effect">
-                <DropdownMenuItem onClick={() => window.location.href = '/api/logout'}>
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="ghost" className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                <User className="w-4 h-4" />
+              </div>
+              <span className="hidden md:inline text-sm">Demo User</span>
+            </Button>
           </div>
         </div>
       </div>

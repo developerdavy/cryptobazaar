@@ -142,4 +142,106 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Temporary in-memory storage for development
+class MemStorage implements IStorage {
+  private users: Map<string, User> = new Map();
+  private holdings: Map<string, Holding[]> = new Map();
+  private transactions: Map<string, Transaction[]> = new Map();
+  private marketData: Map<string, MarketData> = new Map();
+
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const user: User = {
+      id: userData.id,
+      email: userData.email || null,
+      firstName: userData.firstName || null,
+      lastName: userData.lastName || null,
+      profileImageUrl: userData.profileImageUrl || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(userData.id, user);
+    return user;
+  }
+
+  async getUserHoldings(userId: string): Promise<Holding[]> {
+    return this.holdings.get(userId) || [];
+  }
+
+  async getHolding(userId: string, cryptocurrency: string): Promise<Holding | undefined> {
+    const userHoldings = this.holdings.get(userId) || [];
+    return userHoldings.find(h => h.cryptocurrency === cryptocurrency);
+  }
+
+  async upsertHolding(holdingData: InsertHolding): Promise<Holding> {
+    const holding: Holding = {
+      id: Math.floor(Math.random() * 1000000),
+      userId: holdingData.userId,
+      cryptocurrency: holdingData.cryptocurrency,
+      balance: holdingData.balance || "0",
+      averageCost: holdingData.averageCost || "0",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const userHoldings = this.holdings.get(holdingData.userId) || [];
+    const existingIndex = userHoldings.findIndex(h => h.cryptocurrency === holdingData.cryptocurrency);
+    
+    if (existingIndex >= 0) {
+      userHoldings[existingIndex] = holding;
+    } else {
+      userHoldings.push(holding);
+    }
+    
+    this.holdings.set(holdingData.userId, userHoldings);
+    return holding;
+  }
+
+  async createTransaction(transactionData: InsertTransaction): Promise<Transaction> {
+    const transaction: Transaction = {
+      id: Math.floor(Math.random() * 1000000),
+      userId: transactionData.userId,
+      type: transactionData.type,
+      cryptocurrency: transactionData.cryptocurrency,
+      amount: transactionData.amount || "0",
+      fiatAmount: transactionData.fiatAmount || "0",
+      price: transactionData.price || "0",
+      fee: transactionData.fee || "0",
+      status: transactionData.status || "completed",
+      createdAt: new Date(),
+    };
+
+    const userTransactions = this.transactions.get(transactionData.userId) || [];
+    userTransactions.unshift(transaction);
+    this.transactions.set(transactionData.userId, userTransactions);
+    return transaction;
+  }
+
+  async getUserTransactions(userId: string, limit: number = 10): Promise<Transaction[]> {
+    const userTransactions = this.transactions.get(userId) || [];
+    return userTransactions.slice(0, limit);
+  }
+
+  async getMarketData(cryptocurrency: string): Promise<MarketData | undefined> {
+    return this.marketData.get(cryptocurrency);
+  }
+
+  async upsertMarketData(cryptocurrency: string, price: number, priceChange24h: number = 0): Promise<MarketData> {
+    const data: MarketData = {
+      id: Math.floor(Math.random() * 1000000),
+      cryptocurrency,
+      price: price.toString(),
+      priceChange24h: priceChange24h.toString(),
+      volume24h: "0",
+      marketCap: "0",
+      updatedAt: new Date(),
+    };
+    this.marketData.set(cryptocurrency, data);
+    return data;
+  }
+}
+
+export const storage = new MemStorage();
