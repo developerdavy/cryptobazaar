@@ -15,7 +15,8 @@ import History from "@/pages/history";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
+      <Route path="/" component={Landing} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/trade" component={Trade} />
       <Route path="/wallet" component={Wallet} />
       <Route path="/markets" component={Markets} />
