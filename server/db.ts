@@ -5,6 +5,10 @@ import * as schema from "@shared/schema";
 
 neonConfig.webSocketConstructor = ws;
 
+// Declare exports at top level
+export let pool: any;
+export let db: any;
+
 // Check if DATABASE_URL is set
 if (!process.env.DATABASE_URL) {
   console.warn("⚠️  DATABASE_URL is not set!");
@@ -22,9 +26,9 @@ if (!process.env.DATABASE_URL) {
     end: () => Promise.resolve()
   } as any;
   
-  export const pool = mockPool;
-  export const db = drizzle({ client: mockPool, schema });
+  pool = mockPool;
+  db = drizzle({ client: mockPool, schema });
 } else {
-  export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  export const db = drizzle({ client: pool, schema });
+  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  db = drizzle({ client: pool, schema });
 }
